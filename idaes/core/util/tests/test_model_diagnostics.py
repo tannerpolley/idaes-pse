@@ -29,10 +29,12 @@ from pyomo.environ import (
     Suffix,
     TransformationFactory,
     units,
+    value,
     Var,
 )
 from pyomo.common.collections import ComponentSet
 from pyomo.contrib.pynumero.asl import AmplInterface
+from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 
 import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslog
@@ -49,7 +51,11 @@ from pyomo.dae import ContinuousSet, DerivativeVar
 # Need to update
 from idaes.core.util.model_diagnostics import (
     DiagnosticsToolbox,
+    SVDToolbox,
     DegeneracyHunter,
+    DegeneracyHunter2,
+    svd_dense,
+    svd_sparse,
     get_valid_range_of_component,
     set_bounds_from_valid_range,
     list_components_with_values_outside_valid_range,
@@ -65,6 +71,8 @@ from idaes.core.util.model_diagnostics import (
 )
 
 __author__ = "Alex Dowling, Douglas Allan, Andrew Lee"
+
+solver_available = SolverFactory("scip").available()
 
 
 @pytest.fixture
@@ -1219,7 +1227,573 @@ Suggested next steps:
 
 ====================================================================================
 """
-        print(stream.getvalue())
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.skipif(
+        not AmplInterface.available(), reason="pynumero_ASL is not available"
+    )
+    @pytest.mark.integration
+    def test_prepare_svd_toolbox(self, model):
+        dt = DiagnosticsToolbox(model=model.b)
+        svd = dt.prepare_svd_toolbox()
+
+        assert isinstance(svd, SVDToolbox)
+
+    @pytest.mark.skipif(
+        not AmplInterface.available(), reason="pynumero_ASL is not available"
+    )
+    @pytest.mark.integration
+    def test_prepare_degeneracy_hunter(self, model):
+        dt = DiagnosticsToolbox(model=model.b)
+        dh = dt.prepare_degeneracy_hunter()
+
+        assert isinstance(dh, DegeneracyHunter2)
+
+
+@pytest.mark.skipif(
+    not AmplInterface.available(), reason="pynumero_ASL is not available"
+)
+class TestSVDToolbox:
+    @pytest.mark.unit
+    def test_init(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem)
+
+        assert svd._model is dummy_problem
+        assert svd.u is None
+        assert svd.s is None
+        assert svd.v is None
+
+        # Get Jacobian and NLP
+        jac = {
+            (0, 0): 100.0,
+            (1, 1): 1.0,
+            (2, 2): 10.0,
+            (3, 3): 0.1,
+            (4, 4): 5.0,
+        }
+        for i, j in jac.items():
+            assert j == svd.jacobian[i]
+
+        assert isinstance(svd.nlp, PyomoNLP)
+
+    @pytest.mark.unit
+    def test_init_small_model(self):
+        m = ConcreteModel()
+        m.v = Var()
+        m.c = Constraint(expr=m.v == 10)
+
+        with pytest.raises(
+            ValueError,
+            match="Model needs at least 2 equality constraints to perform svd_analysis.",
+        ):
+            svd = SVDToolbox(m)
+
+    @pytest.mark.unit
+    def test_run_svd_analysis(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem)
+
+        assert svd.config.svd_callback is svd_dense
+
+        svd.run_svd_analysis()
+
+        np.testing.assert_array_almost_equal(
+            svd.u,
+            np.array(
+                [[0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]]
+            ),
+        )
+        np.testing.assert_array_almost_equal(svd.s, np.array([0.1, 1, 5, 10]))
+        np.testing.assert_array_almost_equal(
+            svd.v,
+            np.array(
+                [[0, 0, 0, 1, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 1], [0, 0, 1, 0, 0]]
+            ).T,
+        )
+
+    @pytest.mark.unit
+    def test_run_svd_analysis_sparse(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem, svd_callback=svd_sparse)
+        svd.run_svd_analysis()
+
+        # SVD sparse is not consistent with signs - manually iterate and check abs value
+        for i in range(5):
+            for j in range(4):
+                if (i, j) in [(1, 1), (2, 3), (3, 0), (4, 2)]:
+                    assert abs(svd.u[i, j]) == pytest.approx(1, abs=1e-6, rel=1e-6)
+                else:
+                    assert svd.u[i, j] == pytest.approx(0, abs=1e-6)
+
+        np.testing.assert_array_almost_equal(svd.s, np.array([0.1, 1, 5, 10]))
+
+        for i in range(5):
+            for j in range(4):
+                if (i, j) in [(1, 1), (2, 3), (3, 0), (4, 2)]:
+                    assert abs(svd.v[i, j]) == pytest.approx(1, abs=1e-6, rel=1e-6)
+                else:
+                    assert svd.v[i, j] == pytest.approx(0, abs=1e-6)
+
+    @pytest.mark.unit
+    def test_run_svd_analysis_sparse_limit(self, dummy_problem):
+        svd = SVDToolbox(
+            dummy_problem, svd_callback=svd_sparse, number_of_smallest_singular_values=2
+        )
+        svd.run_svd_analysis()
+
+        # SVD sparse is not consistent with signs - manually iterate and check abs value
+        for i in range(5):
+            for j in range(2):
+                if (i, j) in [(1, 1), (3, 0)]:
+                    assert abs(svd.u[i, j]) == pytest.approx(1, abs=1e-6, rel=1e-6)
+                else:
+                    assert svd.u[i, j] == pytest.approx(0, abs=1e-6)
+
+        np.testing.assert_array_almost_equal(svd.s, np.array([0.1, 1]))
+
+        for i in range(5):
+            for j in range(2):
+                if (i, j) in [(1, 1), (3, 0)]:
+                    assert abs(svd.v[i, j]) == pytest.approx(1, abs=1e-6, rel=1e-6)
+                else:
+                    assert svd.v[i, j] == pytest.approx(0, abs=1e-6)
+
+    @pytest.mark.unit
+    def test_display_rank_of_equality_constraints(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem)
+
+        stream = StringIO()
+        svd.display_rank_of_equality_constraints(stream=stream)
+
+        expected = """====================================================================================
+
+Number of Singular Values less than tolerance is 0
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_rank_of_equality_constraints(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem, singular_value_tolerance=1)
+
+        stream = StringIO()
+        svd.display_rank_of_equality_constraints(stream=stream)
+
+        expected = """====================================================================================
+
+Number of Singular Values less than tolerance is 1
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_underdetermined_variables_and_constraints(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem)
+
+        stream = StringIO()
+        svd.display_underdetermined_variables_and_constraints(stream=stream)
+
+        expected = """====================================================================================
+Constraints and Variables associated with smallest singular values
+
+    Smallest Singular Value 1:
+
+        Variables:
+
+            x[3]
+
+        Constraints:
+
+            dummy_eqn[3]
+
+    Smallest Singular Value 2:
+
+        Variables:
+
+            x[1]
+
+        Constraints:
+
+            dummy_eqn[1]
+
+    Smallest Singular Value 3:
+
+        Variables:
+
+            x[4]
+
+        Constraints:
+
+            dummy_eqn[4]
+
+    Smallest Singular Value 4:
+
+        Variables:
+
+            x[2]
+
+        Constraints:
+
+            dummy_eqn[2]
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_underdetermined_variables_and_constraints_specific(
+        self, dummy_problem
+    ):
+        svd = SVDToolbox(dummy_problem)
+
+        stream = StringIO()
+        svd.display_underdetermined_variables_and_constraints(
+            singular_values=[1], stream=stream
+        )
+
+        expected = """====================================================================================
+Constraints and Variables associated with smallest singular values
+
+    Smallest Singular Value 1:
+
+        Variables:
+
+            x[3]
+
+        Constraints:
+
+            dummy_eqn[3]
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_underdetermined_variables_and_constraints(self, dummy_problem):
+        svd = SVDToolbox(dummy_problem, size_cutoff_in_singular_vector=1)
+
+        stream = StringIO()
+        svd.display_underdetermined_variables_and_constraints(stream=stream)
+
+        expected = """====================================================================================
+Constraints and Variables associated with smallest singular values
+
+    Smallest Singular Value 1:
+
+        Variables:
+
+
+        Constraints:
+
+
+    Smallest Singular Value 2:
+
+        Variables:
+
+
+        Constraints:
+
+
+    Smallest Singular Value 3:
+
+        Variables:
+
+
+        Constraints:
+
+
+    Smallest Singular Value 4:
+
+        Variables:
+
+
+        Constraints:
+
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_constraints_including_variable(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        svd = SVDToolbox(m)
+
+        stream = StringIO()
+        svd.display_constraints_including_variable(variable=m.v[1], stream=stream)
+
+        expected = """====================================================================================
+The following constraints involve v[1]:
+
+    c1: 1.0
+    c4: 8.0
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_constraints_including_variable_invalid(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        svd = SVDToolbox(m)
+
+        with pytest.raises(
+            TypeError,
+            match="variable argument must be an instance of a Pyomo _VarData "
+            "object \(got foo\).",
+        ):
+            svd.display_constraints_including_variable(variable="foo")
+
+    @pytest.mark.unit
+    def test_display_constraints_including_variable_not_in_model(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+        m2 = ConcreteModel()
+        m2.y = Var()
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        svd = SVDToolbox(m)
+
+        with pytest.raises(AttributeError, match="Could not find y in model."):
+            svd.display_constraints_including_variable(variable=m2.y)
+
+    @pytest.mark.unit
+    def test_display_variables_in_constraint(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        svd = SVDToolbox(m)
+
+        stream = StringIO()
+        svd.display_variables_in_constraint(constraint=m.c1, stream=stream)
+
+        expected = """====================================================================================
+The following variables are involved in c1:
+
+    v[1]: 1.0
+    v[2]: 2.0
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.unit
+    def test_display_variables_in_constraint_invalid(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        svd = SVDToolbox(m)
+
+        with pytest.raises(
+            TypeError,
+            match="constraint argument must be an instance of a Pyomo _ConstraintData "
+            "object \(got foo\).",
+        ):
+            svd.display_variables_in_constraint(constraint="foo")
+
+    @pytest.mark.unit
+    def test_display_variables_in_constraint_no_in_model(self):
+        m = ConcreteModel()
+        m.s = Set(initialize=[1, 2, 3, 4])
+        m.v = Var(m.s)
+
+        m.c1 = Constraint(expr=m.v[1] + 2 * m.v[2] == 10)
+        m.c2 = Constraint(expr=3 * m.v[2] + 4 * m.v[3] == 20)
+        m.c3 = Constraint(expr=5 * m.v[3] + 6 * m.v[4] == 30)
+        m.c4 = Constraint(expr=7 * m.v[4] + 8 * m.v[1] == 40)
+
+        c6 = Constraint(expr=m.v[1] == m.v[2])
+
+        svd = SVDToolbox(m)
+
+        with pytest.raises(
+            AttributeError, match="Could not find AbstractScalarConstraint in model."
+        ):
+            svd.display_variables_in_constraint(constraint=c6)
+
+
+@pytest.mark.skipif(
+    not AmplInterface.available(), reason="pynumero_ASL is not available"
+)
+class TestDegeneracyHunter:
+    @pytest.fixture
+    def model(self):
+        m = ConcreteModel()
+
+        m.I = Set(initialize=[i for i in range(1, 4)])
+
+        m.x = Var(m.I, bounds=(0, 5), initialize=1.0)
+
+        m.con1 = Constraint(expr=m.x[1] + m.x[2] >= 1)
+        m.con2 = Constraint(expr=m.x[1] + m.x[2] + m.x[3] == 1)
+        m.con3 = Constraint(expr=m.x[2] - 2 * m.x[3] <= 1)
+        m.con4 = Constraint(expr=m.x[1] + m.x[3] >= 1)
+
+        m.con5 = Constraint(expr=m.x[1] + m.x[2] + m.x[3] == 1)
+
+        m.obj = Objective(expr=sum(m.x[i] for i in m.I))
+
+        return m
+
+    @pytest.mark.unit
+    def test_init(self, model):
+        dh = DegeneracyHunter2(model)
+
+        assert dh._model is model
+
+        # Get Jacobian and NLP
+        jac = {
+            (0, 0): 1.0,
+            (0, 1): 1.0,
+            (0, 2): 1.0,
+            (1, 0): 1.0,
+            (1, 1): 1.0,
+            (1, 2): 1.0,
+        }
+
+        for i, j in jac.items():
+            assert j == dh.jacobian[i]
+
+        assert isinstance(dh.nlp, PyomoNLP)
+
+        assert dh.degenerate_set == {}
+        assert dh.irreducible_degenerate_sets == []
+
+    @pytest.mark.unit
+    def test_prepare_candidates_milp(self, model):
+        dh = DegeneracyHunter2(model)
+        dh._prepare_candidates_milp()
+
+        assert isinstance(dh.candidates_milp, ConcreteModel)
+
+    @pytest.mark.solver
+    @pytest.mark.component
+    @pytest.mark.skipif(not solver_available, reason="SCIP is not available")
+    def test_solve_candidates_milp(self, model):
+        dh = DegeneracyHunter2(model)
+        dh._prepare_candidates_milp()
+        dh._solve_candidates_milp()
+
+        assert dh.degenerate_set == {
+            model.con2: -1e-05,
+            model.con5: 1e-05,
+        }
+
+    @pytest.mark.unit
+    def test_prepare_ids_milp(self, model):
+        dh = DegeneracyHunter2(model)
+        dh._prepare_ids_milp()
+
+        assert isinstance(dh.ids_milp, ConcreteModel)
+
+    @pytest.mark.solver
+    @pytest.mark.component
+    @pytest.mark.skipif(not solver_available, reason="SCIP is not available")
+    def test_solve_ids_milp(self, model):
+        dh = DegeneracyHunter2(model)
+        dh._prepare_ids_milp()
+        ids_ = dh._solve_ids_milp(cons=model.con2)
+
+        assert ids_ == {model.con2: -1}
+
+    @pytest.mark.solver
+    @pytest.mark.component
+    @pytest.mark.skipif(not solver_available, reason="SCIP is not available")
+    def test_find_irreducible_degenerate_sets(self, model):
+        dh = DegeneracyHunter2(model)
+        dh.find_irreducible_degenerate_sets()
+
+        assert dh.irreducible_degenerate_sets == [
+            {model.con2: -1},
+            {model.con5: 1},
+        ]
+
+    @pytest.mark.solver
+    @pytest.mark.component
+    @pytest.mark.skipif(not solver_available, reason="SCIP is not available")
+    def test_report_irreducible_degenerate_sets(self, model):
+        stream = StringIO()
+
+        dh = DegeneracyHunter2(model)
+        dh.report_irreducible_degenerate_sets(stream=stream)
+
+        expected = """====================================================================================
+Irreducible Degenerate Sets
+
+    Irreducible Degenerate Set 0
+        nu	Constraint Name
+        -1.0	con2
+
+    Irreducible Degenerate Set 1
+        nu	Constraint Name
+        1.0	con5
+
+====================================================================================
+"""
+
+        assert stream.getvalue() == expected
+
+    @pytest.mark.solver
+    @pytest.mark.component
+    @pytest.mark.skipif(not solver_available, reason="SCIP is not available")
+    def test_report_irreducible_degenerate_sets_none(self, model):
+        stream = StringIO()
+
+        # Delete degenerate constraint
+        model.del_component(model.con5)
+
+        dh = DegeneracyHunter2(model)
+        dh.report_irreducible_degenerate_sets(stream=stream)
+
+        expected = """====================================================================================
+Irreducible Degenerate Sets
+
+    No candidate equations. The Jacobian is likely full rank.
+
+====================================================================================
+"""
+
         assert stream.getvalue() == expected
 
 

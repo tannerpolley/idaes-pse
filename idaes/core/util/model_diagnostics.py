@@ -40,14 +40,22 @@ from pyomo.environ import (
     Var,
 )
 from pyomo.core.base.block import _BlockData
+from pyomo.core.base.var import _VarData
+from pyomo.core.base.constraint import _ConstraintData
 from pyomo.common.collections import ComponentSet
-from pyomo.common.config import ConfigDict, ConfigValue, document_kwargs_from_configdict
+from pyomo.common.config import (
+    ConfigDict,
+    ConfigValue,
+    document_kwargs_from_configdict,
+    PositiveInt,
+)
 from pyomo.util.check_units import identify_inconsistent_units
 from pyomo.contrib.incidence_analysis import IncidenceGraphInterface
 from pyomo.core.expr.visitor import identify_variables
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 from pyomo.contrib.pynumero.asl import AmplInterface
 from pyomo.common.deprecation import deprecation_warning
+from pyomo.common.errors import PyomoException
 
 from idaes.core.util.model_statistics import (
     activated_blocks_set,
@@ -80,6 +88,46 @@ MAX_STR_LENGTH = 84
 TAB = " " * 4
 
 # TODO: Add suggested steps to cautions - how?
+
+
+def svd_dense(jacobian, number_singular_values):
+    """
+    Callback for performing SVD analysis using scipy.linalg.svd
+
+    Args:
+        jacobian: Jacobian to be analysed
+        number_singular_values: number of singular values to compute
+
+    Returns:
+        u, s and v numpy arrays
+
+    """
+    u, s, vT = svd(jacobian.todense(), full_matrices=False)
+    # Reorder singular values and vectors so that the singular
+    # values are from least to greatest
+    u = np.flip(u[:, -number_singular_values:], axis=1)
+    s = np.flip(s[-number_singular_values:], axis=0)
+    vT = np.flip(vT[-number_singular_values:, :], axis=0)
+
+    return u, s, vT.transpose()
+
+
+def svd_sparse(jacobian, number_singular_values):
+    """
+    Callback for performing SVD analysis using scipy.sparse.linalg.svds
+
+    Args:
+        jacobian: Jacobian to be analysed
+        number_singular_values: number of singular values to compute
+
+    Returns:
+        u, s and v numpy arrays
+
+    """
+    u, s, vT = svds(jacobian, k=number_singular_values, which="SM")
+
+    return u, s, vT.transpose()
+
 
 CONFIG = ConfigDict()
 CONFIG.declare(
@@ -173,6 +221,94 @@ CONFIG.declare(
         default=1e-8,
         domain=float,
         description="Tolerance for raising a warning for small Jacobian values.",
+    ),
+)
+
+
+SVDCONFIG = ConfigDict()
+SVDCONFIG.declare(
+    "number_of_smallest_singular_values",
+    ConfigValue(
+        domain=PositiveInt,
+        description="Number of smallest singular values to compute",
+    ),
+)
+SVDCONFIG.declare(
+    "svd_callback",
+    ConfigValue(
+        default=svd_dense,
+        description="Callback to SVD method of choice (default = svd_dense)",
+        doc="Callback to SVD method of choice (default = svd_dense). "
+        "Callbacks should take the Jacobian and number of singular values "
+        "to compute as options, plus any method specific arguments, and should "
+        "return the u, s and v matrices as numpy arrays.",
+    ),
+)
+SVDCONFIG.declare(
+    "svd_callback_arguments",
+    ConfigValue(
+        default=None,
+        domain=dict,
+        description="Optional arguments to pass to  SVD callback (default = None)",
+    ),
+)
+SVDCONFIG.declare(
+    "singular_value_tolerance",
+    ConfigValue(
+        default=1e-6,
+        domain=float,
+        description="Tolerance for defining a small singular value",
+    ),
+)
+SVDCONFIG.declare(
+    "size_cutoff_in_singular_vector",
+    ConfigValue(
+        default=0.1,
+        domain=float,
+        description="Size below which to ignore constraints and variables in "
+        "the singular vector",
+    ),
+)
+
+
+DHCONFIG = ConfigDict()
+DHCONFIG.declare(
+    "solver",
+    ConfigValue(
+        default="scip",
+        domain=str,
+        description="MILP solver to use for finding irreducible degenerate sets.",
+    ),
+)
+DHCONFIG.declare(
+    "solver_options",
+    ConfigValue(
+        domain=None,
+        description="Options to pass to MILP solver.",
+    ),
+)
+DHCONFIG.declare(
+    "M",  # TODO: Need better name
+    ConfigValue(
+        default=1e5,
+        domain=float,
+        description="Maximum value for nu in MILP models.",
+    ),
+)
+DHCONFIG.declare(
+    "m_small",  # TODO: Need better name
+    ConfigValue(
+        default=1e-5,
+        domain=float,
+        description="Smallest value for nu to be considered non-zero in MILP models.",
+    ),
+)
+DHCONFIG.declare(
+    "tolerance",  # TODO: Need better name
+    ConfigValue(
+        default=1e-6,
+        domain=float,
+        description="Tolerance for identifying non-zero rows in Jacobian.",
     ),
 )
 
@@ -1041,9 +1177,673 @@ class DiagnosticsToolbox:
             lines_list=next_steps,
             title="Suggested next steps:",
             line_if_empty=f"If you still have issues converging your model consider:\n"
-            f"{TAB*2}svd_analysis(TBA)\n{TAB*2}degeneracy_hunter (TBA)",
+            f"{TAB*2}prepare_svd_toolbox\n{TAB*2}prepare_degeneracy_hunter",
             footer="=",
         )
+
+    @document_kwargs_from_configdict(SVDCONFIG)
+    def prepare_svd_toolbox(self, **kwargs):
+        """
+        Create an instance of the SVDToolbox and store as self.svd_toolbox.
+
+        After creating an instance of the toolbox, call
+        display_underdetermined_variables_and_constraints().
+
+        Returns:
+
+            Instance of SVDToolbox
+
+        """
+        self.svd_toolbox = SVDToolbox(self.model, **kwargs)
+
+        return self.svd_toolbox
+
+    @document_kwargs_from_configdict(DHCONFIG)
+    def prepare_degeneracy_hunter(self, **kwargs):
+        """
+        Create an instance of the DegeneracyHunter and store as self.degeneracy_hunter.
+
+        After creating an instance of the toolbox, call
+        report_irreducible_degenerate_sets.
+
+        Returns:
+
+            Instance of DegeneracyHunter
+
+        """
+        self.degeneracy_hunter = DegeneracyHunter2(self.model, **kwargs)
+
+        return self.degeneracy_hunter
+
+
+@document_kwargs_from_configdict(SVDCONFIG)
+class SVDToolbox:
+    """
+    Toolbox for performing Singular Value Decomposition on the model Jacobian.
+
+    Used help() for more information on available methods.
+
+    Original code by Doug Allan
+
+    Args:
+
+        model: model to be diagnosed. The SVDToolbox does not support indexed Blocks.
+
+    """
+
+    def __init__(self, model: _BlockData, **kwargs):
+        # TODO: In future may want to generalise this to accept indexed blocks
+        # However, for now some of the tools do not support indexed blocks
+        if not isinstance(model, _BlockData):
+            raise TypeError(
+                "model argument must be an instance of a Pyomo BlockData object "
+                "(either a scalar Block or an element of an indexed Block)."
+            )
+
+        self._model = model
+        self.config = SVDCONFIG(kwargs)
+
+        self.u = None
+        self.s = None
+        self.v = None
+
+        # Get Jacobian and NLP
+        self.jacobian, self.nlp = get_jacobian(self._model, scaled=False)
+
+        if self.jacobian.shape[0] < 2:
+            raise ValueError(
+                "Model needs at least 2 equality constraints to perform svd_analysis."
+            )
+
+    def run_svd_analysis(self):
+        """
+        Perform SVD analysis of the constraint Jacobian
+
+        Args:
+
+            None
+
+        Returns:
+
+            None
+
+        Actions:
+            Stores SVD results in object
+
+        """
+        n_eq = self.jacobian.shape[0]
+        n_var = self.jacobian.shape[1]
+
+        n_sv = self.config.number_of_smallest_singular_values
+        if n_sv is None:
+            # Determine the number of singular values to compute
+            # The "-1" is needed to avoid an error with svds
+            n_sv = min(10, min(n_eq, n_var) - 1)
+        elif n_sv >= min(n_eq, n_var):
+            raise ValueError(
+                f"For a {n_eq} by {n_var} system, svd_analysis "
+                f"can compute at most {min(n_eq, n_var) - 1} "
+                f"singular values and vectors, but {n_sv} were called for."
+            )
+
+        # Get optional arguments for SVD callback
+        svd_callback_arguments = self.config.svd_callback_arguments
+        if svd_callback_arguments is None:
+            svd_callback_arguments = {}
+
+        # Perform SVD
+        # Recall J is a n_eq x n_var matrix
+        # Thus U is a n_eq x n_eq matrix
+        # And V is a n_var x n_var
+        # (U or V may be smaller in economy mode)
+        u, s, v = self.config.svd_callback(
+            self.jacobian,
+            number_singular_values=n_sv,
+            **svd_callback_arguments,
+        )
+
+        # Save results
+        self.u = u
+        self.s = s
+        self.v = v
+
+    def display_rank_of_equality_constraints(self, stream=stdout):
+        """
+        Method to display the number of singular values that fall below
+        tolerance specified in config block.
+
+        Args:
+            stream: I/O object to write report to (default = stdout)
+
+        Returns:
+            None
+
+        """
+        if self.s is None:
+            self.run_svd_analysis()
+
+        counter = 0
+        for e in self.s:
+            if e < self.config.singular_value_tolerance:
+                counter += 1
+
+        stream.write("=" * MAX_STR_LENGTH + "\n\n")
+        stream.write(f"Number of Singular Values less than tolerance is {counter}\n\n")
+        stream.write("=" * MAX_STR_LENGTH + "\n")
+
+    def display_underdetermined_variables_and_constraints(
+        self, singular_values=None, stream=stdout
+    ):
+        """
+        Determines constraints and variables associated with the smallest
+        singular values by having large components in the left and right
+        singular vectors, respectively, associated with those singular values.
+
+        Args:
+            singular_values: List of ints representing singular values to display,
+                as ordered from least to greatest starting from 1 (default show all)
+            stream: I/O object to write report to (default = stdout)
+
+        Returns:
+            None
+
+        """
+        if self.s is None:
+            self.run_svd_analysis()
+
+        tol = self.config.size_cutoff_in_singular_vector
+
+        # Get list of equality constraint and variable names
+        eq_con_list = self.nlp.get_pyomo_equality_constraints()
+        var_list = self.nlp.get_pyomo_variables()
+
+        if singular_values is None:
+            singular_values = range(1, len(self.s) + 1)
+
+        stream.write("=" * MAX_STR_LENGTH + "\n")
+        stream.write(
+            "Constraints and Variables associated with smallest singular values\n\n"
+        )
+
+        for e in singular_values:
+            # First, make sure values are feasible
+            if e > len(self.s):
+                raise ValueError(
+                    f"Cannot display the {e}-th smallest singular value. "
+                    f"Only {len(self.s)} small singular values have been "
+                    f"calculated. You can set the number_of_smallest_singular_values "
+                    f"config argument and call run_svd_analysis again to get more "
+                    f"singular values."
+                )
+
+            stream.write(f"{TAB}Smallest Singular Value {e}:\n\n")
+            stream.write(f"{2 * TAB}Variables:\n\n")
+            for v in np.where(abs(self.v[:, e - 1]) > tol)[0]:
+                stream.write(f"{3 * TAB}{var_list[v].name}\n")
+
+            stream.write(f"\n{2 * TAB}Constraints:\n\n")
+            for c in np.where(abs(self.u[:, e - 1]) > tol)[0]:
+                stream.write(f"{3 * TAB}{eq_con_list[c].name}\n")
+            stream.write("\n")
+
+        stream.write("=" * MAX_STR_LENGTH + "\n")
+
+    def display_constraints_including_variable(self, variable, stream=stdout):
+        """
+        Display all constraints that include the specified variable and the
+        associated Jacobian coefficient.
+
+        Args:
+            variable: variable object to get associated constraints for
+            stream: I/O object to write report to (default = stdout)
+
+        Returns:
+            None
+
+        """
+        # Validate variable argument
+        if not isinstance(variable, _VarData):
+            raise TypeError(
+                f"variable argument must be an instance of a Pyomo _VarData "
+                f"object (got {variable})."
+            )
+
+        # Get list of equality constraint and variable names
+        eq_con_list = self.nlp.get_pyomo_equality_constraints()
+        var_list = self.nlp.get_pyomo_variables()
+
+        # Get index of variable in Jacobian
+        try:
+            var_idx = var_list.index(variable)
+        except (ValueError, PyomoException):
+            raise AttributeError(f"Could not find {variable.name} in model.")
+
+        nonzeroes = self.jacobian[:, var_idx].nonzero()
+
+        # Build a list of all constraints that include var
+        cons_w_var = []
+        for i, r in enumerate(nonzeroes[0]):
+            cons_w_var.append(
+                f"{eq_con_list[r].name}: {self.jacobian[(r, nonzeroes[1][i])]}"
+            )
+
+        # Write the output
+        _write_report_section(
+            stream=stream,
+            lines_list=cons_w_var,
+            title=f"The following constraints involve {variable.name}:",
+            header="=",
+            footer="=",
+        )
+
+    def display_variables_in_constraint(self, constraint, stream=stdout):
+        """
+        Display all variables that appear in the specified constraint and the
+        associated Jacobian coefficient.
+
+        Args:
+            constraint: constraint object to get associated variables for
+            stream: I/O object to write report to (default = stdout)
+
+        Returns:
+            None
+
+        """
+        # Validate variable argument
+        if not isinstance(constraint, _ConstraintData):
+            raise TypeError(
+                f"constraint argument must be an instance of a Pyomo _ConstraintData "
+                f"object (got {constraint})."
+            )
+
+        # Get list of equality constraint and variable names
+        eq_con_list = self.nlp.get_pyomo_equality_constraints()
+        var_list = self.nlp.get_pyomo_variables()
+
+        # Get index of variable in Jacobian
+        try:
+            con_idx = eq_con_list.index(constraint)
+        except ValueError:
+            raise AttributeError(f"Could not find {constraint.name} in model.")
+
+        nonzeroes = self.jacobian[con_idx, :].nonzero()
+
+        # Build a list of all vars in constraint
+        vars_in_cons = []
+        for i, r in enumerate(nonzeroes[0]):
+            c = nonzeroes[1][i]
+            vars_in_cons.append(f"{var_list[c].name}: {self.jacobian[(r, c)]}")
+
+        # Write the output
+        _write_report_section(
+            stream=stream,
+            lines_list=vars_in_cons,
+            title=f"The following variables are involved in {constraint.name}:",
+            header="=",
+            footer="=",
+        )
+
+
+# TODO: Rename and redirect once old DegeneracyHunter is removed
+@document_kwargs_from_configdict(DHCONFIG)
+class DegeneracyHunter2:
+    """
+    Degeneracy Hunter is a tool for identifying Irreducible Degenerate Sets (IDS) in
+    Pyomo models.
+
+    Original implementation by Alex Dowling.
+
+    Args:
+
+        model: model to be diagnosed. The DegeneracyHunter does not support indexed Blocks.
+
+    """
+
+    def __init__(self, model, **kwargs):
+        # TODO: In future may want to generalise this to accept indexed blocks
+        # However, for now some of the tools do not support indexed blocks
+        if not isinstance(model, _BlockData):
+            raise TypeError(
+                "model argument must be an instance of a Pyomo BlockData object "
+                "(either a scalar Block or an element of an indexed Block)."
+            )
+
+        self._model = model
+        self.config = DHCONFIG(kwargs)
+
+        # Get Jacobian and NLP
+        self.jacobian, self.nlp = get_jacobian(
+            self._model, scaled=False, equality_constraints_only=True
+        )
+
+        # Placeholder for solver - deferring construction lets us unit test more easily
+        self.solver = None
+
+        # Create placeholders for results
+        self.degenerate_set = {}
+        self.irreducible_degenerate_sets = []
+
+    def _get_solver(self):
+        if self.solver is None:
+            self.solver = SolverFactory(self.config.solver)
+
+            options = self.config.solver_options
+            if options is None:
+                options = {}
+
+            self.solver.options = options
+
+        return self.solver
+
+    def _prepare_candidates_milp(self):
+        """
+        Prepare MILP to find candidate equations for consider for IDS
+
+        Args:
+
+            None
+
+        Returns:
+
+            m_fc: Pyomo model to find candidates
+
+        """
+        _log.info("Building MILP model.")
+
+        # Create Pyomo model for irreducible degenerate set
+        m_dh = ConcreteModel()
+
+        # Create index for constraints
+        m_dh.C = Set(initialize=range(self.jacobian.shape[0]))
+        m_dh.V = Set(initialize=range(self.jacobian.shape[1]))
+
+        # Specify minimum size for nu to be considered non-zero
+        M = self.config.M
+        m_small = self.config.m_small
+
+        # Add variables
+        m_dh.nu = Var(
+            m_dh.C,
+            bounds=(-M - m_small, M + m_small),
+            initialize=1.0,
+        )
+        m_dh.y_pos = Var(m_dh.C, domain=Binary)
+        m_dh.y_neg = Var(m_dh.C, domain=Binary)
+        m_dh.abs_nu = Var(m_dh.C, bounds=(0, M + m_small))
+
+        m_dh.pos_xor_neg = Constraint(m_dh.C)
+
+        # Constraint to enforce set is degenerate
+        if issparse(self.jacobian):
+            J = self.jacobian.tocsc()
+
+            def eq_degenerate(m_dh, v):
+                if np.sum(np.abs(J[:, v])) > self.config.tolerance:
+                    # Find the columns with non-zero entries
+                    C_ = find(J[:, v])[0]
+                    return sum(J[c, v] * m_dh.nu[c] for c in C_) == 0
+                else:
+                    # This variable does not appear in any constraint
+                    return Constraint.Skip
+
+        else:
+            J = self.jacobian
+
+            def eq_degenerate(m_dh, v):
+                if np.sum(np.abs(J[:, v])) > self.config.tolerance:
+                    return sum(J[c, v] * m_dh.nu[c] for c in m_dh.C) == 0
+                else:
+                    # This variable does not appear in any constraint
+                    return Constraint.Skip
+
+        m_dh.degenerate = Constraint(m_dh.V, rule=eq_degenerate)
+
+        # When y_pos = 1, nu >= m_small
+        # When y_pos = 0, nu >= - m_small
+        def eq_pos_lower(b, c):
+            return b.nu[c] >= -m_small + 2 * m_small * b.y_pos[c]
+
+        m_dh.pos_lower = Constraint(m_dh.C, rule=eq_pos_lower)
+
+        # When y_pos = 1, nu <= M + m_small
+        # When y_pos = 0, nu <= m_small
+        def eq_pos_upper(b, c):
+            return b.nu[c] <= M * b.y_pos[c] + m_small
+
+        m_dh.pos_upper = Constraint(m_dh.C, rule=eq_pos_upper)
+
+        # When y_neg = 1, nu <= -m_small
+        # When y_neg = 0, nu <= m_small
+        def eq_neg_upper(b, c):
+            return b.nu[c] <= m_small - 2 * m_small * b.y_neg[c]
+
+        m_dh.neg_upper = Constraint(m_dh.C, rule=eq_neg_upper)
+
+        # When y_neg = 1, nu >= -M - m_small
+        # When y_neg = 0, nu >= - m_small
+        def eq_neg_lower(b, c):
+            return b.nu[c] >= -M * b.y_neg[c] - m_small
+
+        m_dh.neg_lower = Constraint(m_dh.C, rule=eq_neg_lower)
+
+        # Absolute value
+        def eq_abs_lower(b, c):
+            return -b.abs_nu[c] <= b.nu[c]
+
+        m_dh.abs_lower = Constraint(m_dh.C, rule=eq_abs_lower)
+
+        def eq_abs_upper(b, c):
+            return b.nu[c] <= b.abs_nu[c]
+
+        m_dh.abs_upper = Constraint(m_dh.C, rule=eq_abs_upper)
+
+        # At least one constraint must be in the degenerate set
+        m_dh.degenerate_set_nonempty = Constraint(
+            expr=sum(m_dh.y_pos[c] + m_dh.y_neg[c] for c in m_dh.C) >= 1
+        )
+
+        # Minimize the L1-norm of nu
+        m_dh.obj = Objective(expr=sum(m_dh.abs_nu[c] for c in m_dh.C))
+
+        self.candidates_milp = m_dh
+
+    def _solve_candidates_milp(self, tee: bool = False):
+        """Solve MILP to generate set of candidate equations
+
+        Arguments:
+
+            tee: print solver output (default = False)
+
+        """
+        _log.info("Solving Candidates MILP model.")
+
+        eq_con_list = self.nlp.get_pyomo_equality_constraints()
+
+        results = self._get_solver().solve(self.candidates_milp, tee=tee)
+
+        self.degenerate_set = {}
+
+        if check_optimal_termination(results):
+            # We found a degenerate set
+            for i in self.candidates_milp.C:
+                # Check if constraint is included
+                if self.candidates_milp.abs_nu[i]() > self.config.m_small * 0.99:
+                    # If it is, save the value of nu
+                    if eq_con_list is None:
+                        name = i
+                    else:
+                        name = eq_con_list[i]
+                    self.degenerate_set[name] = self.candidates_milp.nu[i]()
+        else:
+            _log.debug(
+                "Solver did not return an optimal termination condition for "
+                "Candidates MILP. This probably indicates the system is full rank."
+            )
+
+    def _prepare_ids_milp(self):
+        """
+        Prepare MILP to compute the irreducible degenerate set
+
+        """
+        _log.info("Building MILP model to compute irreducible degenerate set.")
+
+        n_eq = self.jacobian.shape[0]
+        n_var = self.jacobian.shape[1]
+
+        # Create Pyomo model for irreducible degenerate set
+        m_dh = ConcreteModel()
+
+        # Create index for constraints
+        m_dh.C = Set(initialize=range(n_eq))
+        m_dh.V = Set(initialize=range(n_var))
+
+        # Specify minimum size for nu to be considered non-zero
+        M = self.config.M
+
+        # Add variables
+        m_dh.nu = Var(m_dh.C, bounds=(-M, M), initialize=1.0)
+        m_dh.y = Var(m_dh.C, domain=Binary)
+
+        # Constraint to enforce set is degenerate
+        if issparse(self.jacobian):
+            J = self.jacobian.tocsc()
+
+            def eq_degenerate(m_dh, v):
+                # Find the columns with non-zero entries
+                C = find(J[:, v])[0]
+                return sum(J[c, v] * m_dh.nu[c] for c in C) == 0
+
+        else:
+            J = self.jacobian
+
+            def eq_degenerate(m_dh, v):
+                return sum(J[c, v] * m_dh.nu[c] for c in m_dh.C) == 0
+
+        m_dh.degenerate = Constraint(m_dh.V, rule=eq_degenerate)
+
+        def eq_lower(m_dh, c):
+            return -M * m_dh.y[c] <= m_dh.nu[c]
+
+        m_dh.lower = Constraint(m_dh.C, rule=eq_lower)
+
+        def eq_upper(m_dh, c):
+            return m_dh.nu[c] <= M * m_dh.y[c]
+
+        m_dh.upper = Constraint(m_dh.C, rule=eq_upper)
+
+        m_dh.obj = Objective(expr=sum(m_dh.y[c] for c in m_dh.C))
+
+        self.ids_milp = m_dh
+
+    def _solve_ids_milp(self, cons: Constraint, tee: bool = False):
+        """Solve MILP to check if equation 'cons' is a significant component
+        in an irreducible degenerate set
+
+        Args:
+            cons: constraint to consider
+            tee: Boolean, print solver output (default = False)
+
+        Returns:
+            ids: dictionary containing the IDS
+
+        """
+        _log.info(f"Solving IDS MILP for constraint {cons.name}.")
+        eq_con_list = self.nlp.get_pyomo_equality_constraints()
+        cons_idx = eq_con_list.index(cons)
+
+        # Fix weight on candidate equation
+        self.ids_milp.nu[cons_idx].fix(1.0)
+
+        # Solve MILP
+        results = self._get_solver().solve(self.ids_milp, tee=tee)
+
+        self.ids_milp.nu[cons_idx].unfix()
+
+        # Create empty dictionary
+        ids_ = {}
+
+        if check_optimal_termination(results):
+            # We found an irreducible degenerate set
+            for i in self.ids_milp.C:
+                # Check if constraint is included
+                if self.ids_milp.y[i]() > 0.9:
+                    # If it is, save the value of nu
+                    ids_[cons] = self.ids_milp.nu[i]()
+        else:
+            raise ValueError(
+                f"Solver did not return an optimal termination condition for "
+                f"IDS MILP with constraint {cons.name}."
+            )
+
+        return ids_
+
+    def find_irreducible_degenerate_sets(self, tee=False):
+        """
+        Compute irreducible degenerate sets
+
+        Args:
+            tee: Print solver output logs to screen (default=False)
+
+        """
+
+        # Solve to find candidate equations
+        _log.info("Searching for Candidate Equations")
+        self._prepare_candidates_milp()
+        self._solve_candidates_milp(tee=tee)
+
+        # Find irreducible degenerate sets
+        # Check if degenerate_set is not empty
+        if self.degenerate_set:
+
+            _log.info("Searching for Irreducible Degenerate Sets")
+            self._prepare_ids_milp()
+
+            # Loop over candidate equations
+            count = 1
+            for k in self.degenerate_set:
+                _log.info_high(f"Solving MILP {count} of {len(self.degenerate_set)}.")
+
+                # Check if equation is a major element of an IDS
+                ids_ = self._solve_ids_milp(cons=k, tee=tee)
+
+                if ids_ is not None:
+                    self.irreducible_degenerate_sets.append(ids_)
+
+                count += 1
+        else:
+            _log.debug("No candidate equations found")
+
+    def report_irreducible_degenerate_sets(self, stream=stdout, tee: bool = False):
+        """
+        Print a report of all the Irreducible Degenerate Sets (IDS) identified in
+        model.
+
+        Args:
+            stream: I/O object to write report to (default = stdout)
+            tee: whether to write solver output logs to screen
+
+        Returns:
+            None
+
+        """
+        self.find_irreducible_degenerate_sets(tee=tee)
+
+        stream.write("=" * MAX_STR_LENGTH + "\n")
+        stream.write("Irreducible Degenerate Sets\n")
+
+        if self.irreducible_degenerate_sets:
+            for i, s in enumerate(self.irreducible_degenerate_sets):
+                stream.write(f"\n{TAB}Irreducible Degenerate Set {i}")
+                stream.write(f"\n{TAB*2}nu\tConstraint Name")
+                for k, v in s.items():
+                    stream.write(f"\n{TAB*2}{v}\t{k.name}")
+                stream.write("\n")
+        else:
+            stream.write(
+                f"\n{TAB}No candidate equations. The Jacobian is likely full rank.\n"
+            )
+
+        stream.write("\n" + "=" * MAX_STR_LENGTH + "\n")
 
 
 class DegeneracyHunter:
