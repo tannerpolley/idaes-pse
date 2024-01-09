@@ -840,7 +840,7 @@ class DiagnosticsToolbox:
             large=self.config.jacobian_large_value_caution,
             small=self.config.jacobian_small_value_caution,
         )
-        xjc.sort(key=lambda i: abs(log(i[0])), reverse=True)
+        xjc.sort(key=lambda i: abs(i[0]), reverse=True)
 
         _write_report_section(
             stream=stream,
