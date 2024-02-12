@@ -54,7 +54,7 @@ from idaes.core.solvers.petsc import (
     _sub_problem_scaling_suffix,
 )
 
-def make_enhancement_factor_model(blk, lunits):
+def make_enhancement_factor_model(blk, lunits, kinetics=None):
     """
     Enhancement factor based liquid phase mass transfer model.
     """
