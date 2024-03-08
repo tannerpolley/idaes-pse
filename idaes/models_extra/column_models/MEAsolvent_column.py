@@ -1983,7 +1983,6 @@ class MEAColumnData(PackedColumnData):
         ]
 
         interfacial_area_constraints = [
-            "log_area_interfacial_parA_eqn",
             "area_interfacial_eqn",
             "log_area_interfacial_eqn",
         ]
@@ -2279,12 +2278,19 @@ class MEAColumnData(PackedColumnData):
 
         # ---------------------------------------------------------------------
         init_log.info("Step 7: Interfacial area constraint")
+
+        blk.area_interfacial.unfix()
+        blk.log_area_interfacial.unfix()
+
+        blk.area_interfacial_eqn.activate()
+        blk.log_area_interfacial_eqn.activate()
+
         init_log.info(
             "Initializing interfacial area - degrees_of_freedom = {}".format(
                 degrees_of_freedom(blk)
             )
-        )
-
+        )           
+        
         # Confusing naming convention: log_var_eqn are always of the form exp(log_var) == var.
         # log_area_interfacial is defined from the performance equation area_interfacial_eqn
         # and then area_interfacial is back-calculated from the exponential relationship
@@ -2308,6 +2314,12 @@ class MEAColumnData(PackedColumnData):
                 degrees_of_freedom(blk)
             )
         )
+
+        for c in liquid_holdup_constraints:
+            getattr(blk, c).activate()
+
+        self.log_holdup_liq.unfix()
+        self.holdup_liq.unfix()
 
         # Same thing with holdup_liq
         for k in blk.log_holdup_liq_eqn:
