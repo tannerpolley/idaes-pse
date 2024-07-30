@@ -3,7 +3,7 @@
 # Framework (IDAES IP) was produced under the DOE Institute for the
 # Design of Advanced Energy Systems (IDAES).
 #
-# Copyright (c) 2018-2023 by the software owners: The Regents of the
+# Copyright (c) 2018-2024 by the software owners: The Regents of the
 # University of California, through Lawrence Berkeley National Laboratory,
 # National Technology & Engineering Solutions of Sandia, LLC, Carnegie Mellon
 # University, West Virginia University Research Corporation, et al.
@@ -389,13 +389,9 @@ class KrigingModel:
             of_plus = self.objective_function(var_vector_plus, x, y, p)
             of_minus = self.objective_function(var_vector_minus, x, y, p)
             grad_current = (of_plus - of_minus) / (2 * eps)
-            grad_vec[
-                i,
-            ] = grad_current
+            grad_vec[i,] = grad_current
         if self.regularization is False:
-            grad_vec[
-                -1,
-            ] = 0
+            grad_vec[-1,] = 0
         return grad_vec
 
     def parameter_optimization(self, p):

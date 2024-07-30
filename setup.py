@@ -93,7 +93,7 @@ class ExtraDependencies:
     ]
     omlt = [
         "omlt==1.1",  # fix the version for now as package evolves
-        'tensorflow; python_version < "3.12"',
+        'tensorflow < 2.16.1 ; python_version < "3.12"',
     ]
     grid = [
         "gridx-prescient>=2.2.1",  # idaes.tests.prescient
@@ -132,8 +132,8 @@ kwargs = dict(
     # Put abstract (non-versioned) deps here.
     # Concrete dependencies go in requirements[-dev].txt
     install_requires=[
-        "pyomo >= 6.7.1",
-        "pint",  # required to use Pyomo units
+        "pyomo >= 6.7.3",
+        "pint<0.24",  # required to use Pyomo units. Pint 0.24 only supported on Python >=3.10
         "networkx",  # required to use Pyomo network
         "numpy<2",
         # pandas constraint added on 2023-08-30 b/c bug in v2.1
