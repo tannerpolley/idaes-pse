@@ -1008,6 +1008,8 @@ configuration = {
                 },
                 "vol_mol_liq_comp_coeff": {
                     "a": (10.2074, pyunits.mL / pyunits.mol),  # [2]
+                    "b": (-2.2642, pyunits.mL / pyunits.mol),
+                    "c": (3.0059, pyunits.mL / pyunits.mol),
                     "d": (207, pyunits.mL / pyunits.mol),
                     "e": (-563.3701, pyunits.mL / pyunits.mol),
                 },
