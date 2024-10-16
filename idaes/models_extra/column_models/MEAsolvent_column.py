@@ -73,7 +73,7 @@ from idaes.core.util.initialization import _fix_vars, _restore_fixedness
 #     make_enhancement_factor_model,
 #     initialize_enhancement_factor_model
 # )
-from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order_explicit import (
+from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order import (
     make_enhancement_factor_model,
     initialize_enhancement_factor_model
 )
