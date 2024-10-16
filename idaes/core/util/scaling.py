@@ -52,7 +52,7 @@ from pyomo.core.base.units_container import _PyomoUnit
 
 import idaes.logger as idaeslog
 
-_log = idaeslog.getLogger(__name__)
+_log = idaeslog.getLogger(__name__, level=idaeslog.ERROR)
 
 
 def __none_left_mult(x, y):
