@@ -883,6 +883,11 @@ class k_eq:
         )
         set_param_from_config(rblock, param="k_eq_coeff", index="3", config=config)
 
+        rblock.k_eq_coeff_4 = Var(
+            doc="Equilibrium constant coefficient 4", units=pyunits.dimensionless
+        )
+        set_param_from_config(rblock, param="k_eq_coeff", index="4", config=config)
+
     @staticmethod
     def return_expression(b, rblock, r_idx, T):
         return exp(b.log_k_eq[r_idx]) * ((pyunits.m) ** 3 / pyunits.mol)
@@ -893,7 +898,8 @@ class k_eq:
             rblock.k_eq_coeff_1
             + rblock.k_eq_coeff_2 / T
             + rblock.k_eq_coeff_3 * log(T / pyunits.K)
-            + log(1e-3)
+            + rblock.k_eq_coeff_4 * T
+            # + log(1e-3)
         )
 
     @staticmethod
@@ -1115,7 +1121,14 @@ configuration = {
             "equilibrium_constant": k_eq,
             "equilibrium_form": log_power_law_equil,
             "concentration_form": ConcentrationForm.molarity,
-            "parameter_data": {"k_eq_coeff": {"1": 233.4, "2": -3410, "3": -36.8}},
+            "parameter_data": {
+                "k_eq_coeff": {
+                    "1": 233.4,
+                    "2": -3410,
+                    "3": -36.8,
+                    "4": 0.0
+                }
+            },
         },
         "bicarbonate": {
             "stoichiometry": {
@@ -1128,7 +1141,14 @@ configuration = {
             "equilibrium_constant": k_eq,
             "equilibrium_form": log_power_law_equil,
             "concentration_form": ConcentrationForm.molarity,
-            "parameter_data": {"k_eq_coeff": {"1": 176.72, "2": -2909, "3": -28.46}},
+            "parameter_data": {
+                "k_eq_coeff": {
+                    "1": 176.72,
+                    "2": -2909,
+                    "3": -28.46,
+                    "4": 0.0
+                }
+            },
         },
     },
 }
