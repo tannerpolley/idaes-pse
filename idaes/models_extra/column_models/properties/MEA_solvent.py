@@ -399,6 +399,18 @@ class VolMolCO2:
         )
         set_param_from_config(cobj, param="vol_mol_liq_comp_coeff", index="a")
 
+        cobj.vol_mol_liq_comp_coeff_b = Var(
+            doc="Parameter b for liquid phase molar volume",
+            units=pyunits.mL / pyunits.mol,
+        )
+        set_param_from_config(cobj, param="vol_mol_liq_comp_coeff", index="b")
+
+        cobj.vol_mol_liq_comp_coeff_c = Var(
+            doc="Parameter c for liquid phase molar volume",
+            units=pyunits.mL / pyunits.mol,
+        )
+        set_param_from_config(cobj, param="vol_mol_liq_comp_coeff", index="c")
+
         cobj.vol_mol_liq_comp_coeff_d = Var(
             doc="Parameter d for liquid phase molar volume",
             units=pyunits.mL / pyunits.mol,
