@@ -69,18 +69,23 @@ from idaes.core.solvers.petsc import (
 )
 from idaes.core.initialization import BlockTriangularizationInitializer
 # from idaes.core.util.initialization import _fix_vars, _restore_fixedness
-# from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order_explicit import (
-#     make_enhancement_factor_model,
-#     initialize_enhancement_factor_model
-# )
-from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order import (
-    make_enhancement_factor_model,
-    initialize_enhancement_factor_model
-)
-# from idaes.models_extra.column_models.enhancement_factor_model_third_order import (
-#     make_enhancement_factor_model,
-#     initialize_enhancement_factor_model
-# )
+
+enhance_model = 1
+if enhance_model == 1:
+    from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order_explicit import (
+        make_enhancement_factor_model,
+        initialize_enhancement_factor_model)
+
+elif enhance_model == 2:
+    from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order import (
+        make_enhancement_factor_model,
+        initialize_enhancement_factor_model)
+
+elif enhance_model == 3:
+    from idaes.models_extra.column_models.enhancement_factor_model_third_order import (
+        make_enhancement_factor_model,
+        initialize_enhancement_factor_model)
+
 from idaes.core.surrogate.surrogate_block import SurrogateBlock
 __author__ = "Paul Akula, John Eslick, Anuja Deshpande, Andrew Lee, Douglas Allan"
 
