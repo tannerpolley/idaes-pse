@@ -77,6 +77,10 @@ from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_ord
     make_enhancement_factor_model,
     initialize_enhancement_factor_model
 )
+# from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order_explicit import (
+#     make_enhancement_factor_model,
+#     initialize_enhancement_factor_model
+# )
 # from idaes.models_extra.column_models.enhancement_factor_model_third_order import (
 #     make_enhancement_factor_model,
 #     initialize_enhancement_factor_model
