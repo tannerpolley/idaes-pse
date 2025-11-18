@@ -200,6 +200,10 @@ class InitializerBase:
                 m_scaled = TransformationFactory("core.scale_model").create_using(model, rename=False)
             from idaes.core.util import DiagnosticsToolbox
             diag_tbx = DiagnosticsToolbox(m_scaled)
+            diag_tbx.report_structural_issues()
+            diag_tbx.display_variables_with_none_value_in_activated_constraints()
+            diag_tbx.display_constraints_with_large_residuals()
+            diag_tbx.compute_infeasibility_explanation()
             import pdb; pdb.set_trace()
             pass
         # 6. finally: Restore model state

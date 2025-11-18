@@ -153,7 +153,7 @@ def define_state(blk):
     # Add electrolyte state vars if required
     if blk.params._electrolyte:
         # TODO do we need special handling here?
-        raise NotImplementedError()
+        # raise NotImplementedError()
         define_electrolyte_state(blk)
 
     # Add supporting constraints
@@ -386,7 +386,7 @@ def calculate_scaling_factors(blk):
             )
 
     if blk.params._electrolyte:
-        raise NotImplementedError()
+        # raise NotImplementedError()
         calculate_electrolyte_scaling(blk)
 
 

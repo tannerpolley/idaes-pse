@@ -283,7 +283,7 @@ class Test1PhaseDefinedStateFalseNoBounds(object):
 
 
 class Test1PhaseDefinedStateTrueWithBounds(object):
-    # Test define_state method with no bounds and defined_State = False
+    # Test define_state method with bounds and defined_State = True
     @pytest.fixture(scope="class")
     def frame(self):
         m = ConcreteModel()
@@ -1503,6 +1503,8 @@ def test_phase_equilibrium_legacy_initialization():
         model.fs.time, defined_state=False
     )
 
+    print(degrees_of_freedom(model))
+
     model.fs.state[0].pressure.set_value(101325.0)
     model.fs.state[0].temperature.set_value(298.0)
 
@@ -1513,6 +1515,7 @@ def test_phase_equilibrium_legacy_initialization():
 
     assert_units_consistent(model)
     # We expect 6 state variables, but two additional constraints for phase equilibrium
+    print(degrees_of_freedom(model))
     assert degrees_of_freedom(model) == 6 - 2
 
     model.fs.state.initialize()
