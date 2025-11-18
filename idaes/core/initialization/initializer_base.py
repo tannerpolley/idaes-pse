@@ -185,30 +185,26 @@ class InitializerBase:
         self.precheck(model)
 
         # 5. try: Call specified initialization routine
-        try:
+        # try:
         # Base method does not have a return (NotImplementedError),
         # but we expect this to be overloaded, disable pylint warning
         # pylint: disable=E1111
-            results = self.initialization_routine(model)
-            if results is not None and not check_optimal_termination(results):
-                raise InitializationError
-        except Exception as err:
-            from pyomo.environ import TransformationFactory
-            if model.is_indexed():
-                m_scaled = TransformationFactory("core.scale_model").create_using(model[0], rename=False)
-            else:
-                m_scaled = TransformationFactory("core.scale_model").create_using(model, rename=False)
-            from idaes.core.util import DiagnosticsToolbox
-            diag_tbx = DiagnosticsToolbox(m_scaled)
-            diag_tbx.report_structural_issues()
-            diag_tbx.display_variables_with_none_value_in_activated_constraints()
-            diag_tbx.display_constraints_with_large_residuals()
-            diag_tbx.compute_infeasibility_explanation()
-            import pdb; pdb.set_trace()
-            pass
+        results = self.initialization_routine(model)
+        if results is not None and not check_optimal_termination(results):
+            raise InitializationError
+        # except Exception as err:
+        #     from pyomo.environ import TransformationFactory
+        #     if model.is_indexed():
+        #         m_scaled = TransformationFactory("core.scale_model").create_using(model[0], rename=False)
+        #     else:
+        #         m_scaled = TransformationFactory("core.scale_model").create_using(model, rename=False)
+        #     from idaes.core.util import DiagnosticsToolbox
+        #     diag_tbx = DiagnosticsToolbox(m_scaled)
+        #     import pdb; pdb.set_trace()
+        #     pass
         # 6. finally: Restore model state
-        finally:
-            self.restore_model_state(model)
+        # finally:
+        #     self.restore_model_state(model)
         # Also revert local logger level so it does not get carried over to
         # later runs
         self._local_logger_level = None
