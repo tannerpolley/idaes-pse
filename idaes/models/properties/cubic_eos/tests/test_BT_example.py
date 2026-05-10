@@ -29,7 +29,6 @@ from pyomo.util.check_units import assert_units_consistent
 from idaes.models.properties.tests.test_harness import PropertyTestHarness
 from idaes.core.solvers import get_solver
 
-
 # Set module level pyest marker
 pytestmark = pytest.mark.cubic_root
 prop_available = cubic_roots_available()

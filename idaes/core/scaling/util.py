@@ -49,7 +49,6 @@ from pyomo.core.base.units_container import _PyomoUnit
 from idaes.core.util.exceptions import BurntToast
 import idaes.logger as idaeslog
 
-
 _log = idaeslog.getLogger(__name__)
 
 TAB = " " * 4

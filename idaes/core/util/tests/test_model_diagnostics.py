@@ -13,6 +13,7 @@
 """
 This module contains model diagnostic utility functions for use in IDAES (Pyomo) models.
 """
+
 from io import StringIO
 import math
 import numpy as np
@@ -90,7 +91,6 @@ from idaes.core.surrogate.pysmo.sampling import (
     UniformSampling,
 )
 from idaes.core.util.testing import _enable_scip_solver_for_testing
-
 
 __author__ = "Alex Dowling, Douglas Allan, Andrew Lee"
 
@@ -1032,12 +1032,9 @@ The following pairs of variables are nearly parallel:
         assert len(warnings) == 3
         assert "WARNING: 1 Component with inconsistent units" in warnings
         assert "WARNING: 1 Degree of Freedom" in warnings
-        assert (
-            """WARNING: Structural singularity found
+        assert """WARNING: Structural singularity found
         Under-Constrained Set: 3 variables, 2 constraints
-        Over-Constrained Set: 0 variables, 0 constraints"""
-            in warnings
-        )
+        Over-Constrained Set: 0 variables, 0 constraints""" in warnings
 
         assert len(next_steps) == 2
         assert "display_components_with_inconsistent_units()" in next_steps
@@ -1061,12 +1058,9 @@ The following pairs of variables are nearly parallel:
 
         assert len(warnings) == 2
         assert "WARNING: -1 Degree of Freedom" in warnings
-        assert (
-            """WARNING: Structural singularity found
+        assert """WARNING: Structural singularity found
         Under-Constrained Set: 0 variables, 0 constraints
-        Over-Constrained Set: 1 variables, 2 constraints"""
-            in warnings
-        )
+        Over-Constrained Set: 1 variables, 2 constraints""" in warnings
 
         assert len(next_steps) == 1
         assert "display_overconstrained_set()" in next_steps

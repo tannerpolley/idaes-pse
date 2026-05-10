@@ -15,6 +15,7 @@ Tests for scaling utility functions.
 
 Author: Andrew Lee
 """
+
 from io import StringIO
 import os
 import pytest

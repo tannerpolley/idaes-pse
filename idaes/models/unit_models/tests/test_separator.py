@@ -15,6 +15,7 @@ Tests for Separator unit model.
 
 Author: Andrew Lee
 """
+
 import pytest
 import pandas
 
@@ -87,7 +88,6 @@ from idaes.core.initialization import (
     InitializationStatus,
 )
 from idaes.core.util import DiagnosticsToolbox
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

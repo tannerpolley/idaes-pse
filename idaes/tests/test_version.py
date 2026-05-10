@@ -13,6 +13,7 @@
 """
 Tests for versioning
 """
+
 # third-party
 import pytest
 

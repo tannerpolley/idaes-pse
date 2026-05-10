@@ -34,6 +34,7 @@ References:
     [2] Morgan et.al (2015)
     [3] NIST Webbook, https://webbook.nist.gov/
 """
+
 # TODO: Missing docstrings
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
@@ -56,7 +57,6 @@ from idaes.models.properties.modular_properties.phase_equil.henry import HenryTy
 
 from idaes.core.util.misc import set_param_from_config
 import idaes.logger as idaeslog
-
 
 # Set up logger
 _log = idaeslog.getLogger(__name__)
@@ -333,6 +333,7 @@ class VolMolSolvent:
 
         return pyunits.convert(vol_mol, units.VOLUME / units.AMOUNT)
 
+
 class VolMolMEA:
     # Molar volume of MEA as calculated by Morgan [2]
     @staticmethod
@@ -381,12 +382,13 @@ class VolMolMEA:
         vol_mol_pure = pyunits.convert(cobj.mw / rho, units.VOLUME / units.AMOUNT)
 
         vol_mol_interaction = x["H2O"] * (
-            cobj.vol_mol_liq_comp_coeff_b 
-            + cobj.vol_mol_liq_comp_coeff_c * x["MEA"]
+            cobj.vol_mol_liq_comp_coeff_b + cobj.vol_mol_liq_comp_coeff_c * x["MEA"]
         )
-        
 
-        return vol_mol_pure + pyunits.convert(vol_mol_interaction, units.VOLUME / units.AMOUNT)
+        return vol_mol_pure + pyunits.convert(
+            vol_mol_interaction, units.VOLUME / units.AMOUNT
+        )
+
 
 class VolMolCO2:
     # Weiland Method for calculating molar volume of dissolved CO2 [2]
@@ -965,7 +967,7 @@ configuration = {
                     "3": (1.19451, pyunits.g / pyunits.mL),
                 },
                 "vol_mol_liq_comp_coeff": {
-                    "b": (-2.2642, pyunits.mL / pyunits.mol), # [2]
+                    "b": (-2.2642, pyunits.mL / pyunits.mol),  # [2]
                     "c": (3.0059, pyunits.mL / pyunits.mol),
                 },
                 "dh_vap": 58000,  # [3]
@@ -1122,12 +1124,7 @@ configuration = {
             "equilibrium_form": log_power_law_equil,
             "concentration_form": ConcentrationForm.molarity,
             "parameter_data": {
-                "k_eq_coeff": {
-                    "1": 233.4,
-                    "2": -3410,
-                    "3": -36.8,
-                    "4": 0.0
-                }
+                "k_eq_coeff": {"1": 233.4, "2": -3410, "3": -36.8, "4": 0.0}
             },
         },
         "bicarbonate": {
@@ -1142,12 +1139,7 @@ configuration = {
             "equilibrium_form": log_power_law_equil,
             "concentration_form": ConcentrationForm.molarity,
             "parameter_data": {
-                "k_eq_coeff": {
-                    "1": 176.72,
-                    "2": -2909,
-                    "3": -28.46,
-                    "4": 0.0
-                }
+                "k_eq_coeff": {"1": 176.72, "2": -2909, "3": -28.46, "4": 0.0}
             },
         },
     },

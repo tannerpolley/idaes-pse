@@ -31,7 +31,6 @@ from idaes.models.properties.modular_properties.base.generic_property import (
 from idaes.models.properties.modular_properties.base.tests.dummy_eos import DummyEoS
 from idaes.core.util.exceptions import ConfigurationError
 
-
 # Dummy class to use for Psat calls
 Psat = {"H2O": 1e5, "EtOH": 5e4}
 

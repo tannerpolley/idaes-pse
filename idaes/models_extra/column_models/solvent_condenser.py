@@ -53,7 +53,6 @@ from idaes.core.solvers import get_solver
 from idaes.core.util.model_statistics import degrees_of_freedom
 from idaes.core.util.exceptions import ConfigurationError, InitializationError
 
-
 _log = idaeslog.getIdaesLogger(__name__)
 
 
@@ -453,7 +452,7 @@ see property package for documentation.}""",
                 iscale.constraint_scaling_transform(
                     v,
                     iscale.get_scaling_factor(
-                        self.liquid_phase[t].get_material_flow_terms("Liq",j),
+                        self.liquid_phase[t].get_material_flow_terms("Liq", j),
                         default=1,
                         warning=True,
                     ),

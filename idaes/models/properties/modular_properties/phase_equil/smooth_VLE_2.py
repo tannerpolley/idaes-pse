@@ -42,7 +42,6 @@ from idaes.models.properties.modular_properties.eos.ceos import (
 )
 import idaes.core.util.scaling as iscale
 
-
 # Small value for initializing slack variables
 EPS_INIT = 1e-4
 

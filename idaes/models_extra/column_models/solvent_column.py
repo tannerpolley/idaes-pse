@@ -49,7 +49,6 @@ from idaes.core.util.exceptions import ConfigurationError, InitializationError
 import idaes.logger as idaeslog
 from idaes.core.util.config import DefaultBool
 
-
 __author__ = "Paul Akula, John Eslick, Anuja Deshpande, Andrew Lee"
 
 
@@ -486,7 +485,7 @@ and used when constructing these
             initialize=0,
             domain=Reals,
             units=lunits("pressure"),
-            doc="Generalized driving force for mass transfer"
+            doc="Generalized driving force for mass transfer",
         )
 
         self.interphase_mass_transfer = Var(
@@ -541,6 +540,7 @@ and used when constructing these
         vunits = (
             self.config.vapor_phase.property_package.get_metadata().get_derived_units
         )
+
         @self.Constraint(
             self.flowsheet().time,
             self.vapor_phase.length_domain,
@@ -675,12 +675,12 @@ and used when constructing these
                 zb = self.liquid_phase.length_domain.prev(x)
                 lprops = blk.liquid_phase.properties[t, zb]
                 return blk.mass_transfer_driving_force[t, x, j] == (
-                        blk.vapor_phase.properties[t, x].mole_frac_comp[j]
-                        * pyunits.convert(
-                            blk.vapor_phase.properties[t, x].pressure,
-                            to_units=lunits("pressure"),
-                        )
-                        - lprops.fug_phase_comp["Liq", j]
+                    blk.vapor_phase.properties[t, x].mole_frac_comp[j]
+                    * pyunits.convert(
+                        blk.vapor_phase.properties[t, x].pressure,
+                        to_units=lunits("pressure"),
+                    )
+                    - lprops.fug_phase_comp["Liq", j]
                 )
 
     # =========================================================================
@@ -716,7 +716,7 @@ and used when constructing these
                         warning=True,
                     )
 
-                iscale.set_scaling_factor(v, sf_pe*20)
+                iscale.set_scaling_factor(v, sf_pe * 20)
 
         for (t, x), v in self.vapor_phase.heat.items():
             if iscale.get_scaling_factor(v) is None:
@@ -767,7 +767,9 @@ and used when constructing these
             except KeyError:
                 # This implies a non-volatile component
                 sf = iscale.get_scaling_factor(
-                    self.liquid_phase.mass_transfer_term[t, x, "Liq", j], default=1, warning=True
+                    self.liquid_phase.mass_transfer_term[t, x, "Liq", j],
+                    default=1,
+                    warning=True,
                 )
             iscale.constraint_scaling_transform(v, sf)
 
@@ -779,14 +781,17 @@ and used when constructing these
                 # Account for the fact that this equation is written on a vapor unit basis
                 sf_units = pyunits.convert_value(
                     1,
-                    from_units=1 / (lunits("amount") / lunits("time") / lunits("length")),
-                    to_units=1 / (vunits("amount") / vunits("time") / vunits("length"))
+                    from_units=1
+                    / (lunits("amount") / lunits("time") / lunits("length")),
+                    to_units=1 / (vunits("amount") / vunits("time") / vunits("length")),
                 )
                 sf *= sf_units
             except KeyError:
                 # This implies a non-volatile component
                 sf = iscale.get_scaling_factor(
-                    self.vapor_phase.mass_transfer_term[t, x, "Vap", j], default=1, warning=True
+                    self.vapor_phase.mass_transfer_term[t, x, "Vap", j],
+                    default=1,
+                    warning=True,
                 )
             iscale.constraint_scaling_transform(v, sf)
 

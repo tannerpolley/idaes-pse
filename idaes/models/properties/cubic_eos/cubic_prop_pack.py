@@ -23,6 +23,7 @@ Symposium on Process Systems Engineering – PSE 2018, July 1-5, 2018, San Diego
 
 All results have been cross-referenced against other sources.
 """
+
 # TODO: Missing docstrings
 # pylint: disable=missing-function-docstring
 

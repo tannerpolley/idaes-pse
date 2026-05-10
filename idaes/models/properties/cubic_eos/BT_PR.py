@@ -18,6 +18,7 @@ Unless otherwise noted, parameters are from:
 "The Properties of Gases and Liquids, 4th Edition", Reid, Prausnitz and Poling,
 McGraw-Hill, 1987
 """
+
 # Import Pyomo libraries
 from pyomo.environ import Reals, Param, NonNegativeReals, Set, units as pyunits
 
@@ -30,7 +31,6 @@ from idaes.models.properties.cubic_eos.cubic_prop_pack import (
     CubicEoS,
 )
 from idaes.logger import getIdaesLogger
-
 
 # Set up logger
 _log = getIdaesLogger(__name__)

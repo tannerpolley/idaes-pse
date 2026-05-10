@@ -14,6 +14,7 @@
 Methods for setting up FTPx as the state variables in a generic property
 package
 """
+
 # TODO: Missing docstrings
 # pylint: disable=missing-function-docstring
 
@@ -47,7 +48,6 @@ from idaes.core.util.exceptions import ConfigurationError
 import idaes.logger as idaeslog
 import idaes.core.util.scaling as iscale
 from .electrolyte_states import define_electrolyte_state, calculate_electrolyte_scaling
-
 
 # Set up logger
 _log = idaeslog.getLogger(__name__)

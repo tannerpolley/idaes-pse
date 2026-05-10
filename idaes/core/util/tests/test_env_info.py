@@ -13,6 +13,7 @@
 """
 Tests get environment info
 """
+
 import json
 import pytest
 import idaes.ver as ver

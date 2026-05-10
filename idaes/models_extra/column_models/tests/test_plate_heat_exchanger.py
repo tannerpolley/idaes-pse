@@ -39,7 +39,6 @@ from idaes.core.util.testing import initialization_tester
 from idaes.core.solvers import get_solver
 from pyomo.util.check_units import assert_units_consistent, assert_units_equivalent
 
-
 # -----------------------------------------------------------------------------
 # Get default solver for testing
 solver = get_solver()

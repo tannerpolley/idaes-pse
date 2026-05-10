@@ -51,6 +51,7 @@ same arguments you would give the :class:`Version` constructor:
     1.2.3.a
 
 """
+
 import os
 import re
 import sys

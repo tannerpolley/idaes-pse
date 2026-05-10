@@ -52,7 +52,6 @@ from idaes.core.solvers import get_solver
 from idaes.core.util.exceptions import ConfigurationError, InitializationError
 from idaes.core.initialization import SingleControlVolumeUnitInitializer
 
-
 _log = idaeslog.getLogger(__name__)
 
 

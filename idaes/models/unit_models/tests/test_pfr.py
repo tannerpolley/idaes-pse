@@ -15,6 +15,7 @@ Tests for ControlVolumeBlockData.
 
 Author: Andrew Lee
 """
+
 import pytest
 
 from pyomo.environ import check_optimal_termination, ConcreteModel, value, Var, units
@@ -50,7 +51,6 @@ from idaes.core.initialization import (
     InitializationStatus,
 )
 from idaes.core.util import DiagnosticsToolbox
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

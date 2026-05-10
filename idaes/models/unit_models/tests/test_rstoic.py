@@ -15,6 +15,7 @@ Tests for IDAES Stoichiometric reactor.
 
 Author: Chinedu Okoli, Andrew Lee
 """
+
 import pytest
 
 from pyomo.environ import check_optimal_termination, ConcreteModel, value, units
@@ -52,7 +53,6 @@ from idaes.core.initialization import (
     InitializationStatus,
 )
 from idaes.core.util import DiagnosticsToolbox
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

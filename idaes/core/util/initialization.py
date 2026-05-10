@@ -537,6 +537,7 @@ def initialize_by_time_element(fs, time, **kwargs):
     # Logger message that initialization is finished
     init_log.info("Initialization completed. Model has been reactivated")
 
+
 def _fix_vars(var_list):
     flags = ComponentMap()
     for var in var_list:

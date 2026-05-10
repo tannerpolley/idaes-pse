@@ -27,7 +27,7 @@ from pyomo.environ import (
     sqrt,
     units as pyunits,
     Set,
-    Reference
+    Reference,
 )
 from pyomo.common.collections import ComponentSet, ComponentMap
 
@@ -54,11 +54,12 @@ from idaes.core.solvers.petsc import (
     _sub_problem_scaling_suffix,
 )
 
+
 def make_enhancement_factor_model(blk, lunits, kinetics=None):
     """
     Enhancement factor based liquid phase mass transfer model.
     """
-   
+
     @blk.Expression(
         blk.flowsheet().time,
         blk.liquid_phase.length_domain,
@@ -83,7 +84,7 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
                 pyunits.convert(
                     3.1732e9
                     * exp(-4936.6 * pyunits.K / T)
-                    * ((pyunits.m) ** 6 / (pyunits.kmol ** 2 * pyunits.s)),
+                    * ((pyunits.m) ** 6 / (pyunits.kmol**2 * pyunits.s)),
                     to_units=1 / (lunits("time") * lunits("density_mole") ** 2),
                 )
                 * lunits("time")
@@ -106,13 +107,19 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
         if x == b.liquid_phase.length_domain.last():
             return Constraint.Skip
         else:
-            return b.log_hatta_number[t, x] == 0.5 * (
+            return (
+                b.log_hatta_number[t, x]
+                == 0.5
+                * (
                     b.log_rate_constant[t, x]
-                    + 2 * b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
+                    + 2
+                    * b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
                         "Liq", "MEA"
                     ]
                     + b.log_diffus_liq_comp[t, x, "CO2"]
-            ) - b.log_mass_transfer_coeff_liq[t, x, "CO2"]
+                )
+                - b.log_mass_transfer_coeff_liq[t, x, "CO2"]
+            )
 
     blk.conc_CO2_bulk = Var(
         blk.flowsheet().time,
@@ -166,13 +173,12 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
                     + b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
                         "Liq", "CO2"
                     ]
-                ) / lunits("density_mole")
+                )
+                / lunits("density_mole")
             ) == b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
-                       "Liq", "CO2"
-                   ] + log(
-                b.liquid_phase.properties[t, x].henry["Liq", "CO2"]
-                / b.psi[t, zf]
-                + 1
+                "Liq", "CO2"
+            ] + log(
+                b.liquid_phase.properties[t, x].henry["Liq", "CO2"] / b.psi[t, zf] + 1
             )
             # return (
             #     b.conc_CO2_bulk[t, x] * (
@@ -200,17 +206,18 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
         else:
             zf = b.liquid_phase.length_domain.next(x)
             return (
-                    b.log_diffus_liq_comp[t, x, "MEA"]
-                    + b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
-                        "Liq", "MEA"
-                    ]
-                    + b.log_conc_CO2_bulk[t, x]
-                    - log(2)
-                    - b.log_diffus_liq_comp[t, x, "CO2"]
-                    - b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
-                        "Liq", "CO2"
-                    ]
+                b.log_diffus_liq_comp[t, x, "MEA"]
+                + b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
+                    "Liq", "MEA"
+                ]
+                + b.log_conc_CO2_bulk[t, x]
+                - log(2)
+                - b.log_diffus_liq_comp[t, x, "CO2"]
+                - b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
+                    "Liq", "CO2"
+                ]
             )
+
     # ======================================================================
     # Enhancement factor model
     # Reference: Jozsef Gaspar,Philip Loldrup Fosbol, (2015)
@@ -233,6 +240,7 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
         units=pyunits.dimensionless,
         doc="""Logarithm of conc_interface_MEA""",
     )
+
     # =============================================================================
     # ------------------------ ORIGINAL -----------------------------------
     @blk.Expression(
@@ -245,21 +253,17 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
             return Expression.Skip
         else:
             return 1 + (
-                    b.liquid_phase.properties[t, x].diffus_phase_comp_true[
-                        "Liq", "MEA"
-                    ]
-                    * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
-                        "Liq", "MEA"
-                    ]
+                b.liquid_phase.properties[t, x].diffus_phase_comp_true["Liq", "MEA"]
+                * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true["Liq", "MEA"]
             ) * (1 - b.conc_interface_MEA[t, x]) / (
-                           2
-                           * b.liquid_phase.properties[t, x].diffus_phase_comp_true[
-                               "Liq", "MEACOO_-"
-                           ]
-                           * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
-                               "Liq", "MEACOO_-"
-                           ]
-                   )
+                2
+                * b.liquid_phase.properties[t, x].diffus_phase_comp_true[
+                    "Liq", "MEACOO_-"
+                ]
+                * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
+                    "Liq", "MEACOO_-"
+                ]
+            )
 
     @blk.Expression(
         blk.flowsheet().time,
@@ -271,21 +275,15 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
             return Expression.Skip
         else:
             return 1 + (
-                    b.liquid_phase.properties[t, x].diffus_phase_comp_true[
-                        "Liq", "MEA"
-                    ]
-                    * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
-                        "Liq", "MEA"
-                    ]
+                b.liquid_phase.properties[t, x].diffus_phase_comp_true["Liq", "MEA"]
+                * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true["Liq", "MEA"]
             ) * (1 - b.conc_interface_MEA[t, x]) / (
-                           2
-                           * b.liquid_phase.properties[t, x].diffus_phase_comp_true[
-                               "Liq", "MEA_+"
-                           ]
-                           * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
-                               "Liq", "MEA_+"
-                           ]
-                   )
+                2
+                * b.liquid_phase.properties[t, x].diffus_phase_comp_true["Liq", "MEA_+"]
+                * b.liquid_phase.properties[t, x].conc_mol_phase_comp_true[
+                    "Liq", "MEA_+"
+                ]
+            )
 
     # =============================================================================
     blk.conc_CO2_equil_bulk = Var(
@@ -308,10 +306,10 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
             return Constraint.Skip
         else:
             return (
-                    b.conc_CO2_equil_bulk[t, x] * b.conc_interface_MEA[t, x] ** 2
-                    == b.conc_CO2_bulk[t, x]
-                    * b.conc_interface_MEAH[t, x]
-                    * b.conc_interface_MEACOO[t, x]
+                b.conc_CO2_equil_bulk[t, x] * b.conc_interface_MEA[t, x] ** 2
+                == b.conc_CO2_bulk[t, x]
+                * b.conc_interface_MEAH[t, x]
+                * b.conc_interface_MEACOO[t, x]
             )
 
     @blk.Constraint(
@@ -323,10 +321,7 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
         if x == b.liquid_phase.length_domain.last():
             return Constraint.Skip
         else:
-            return (
-                    exp(b.log_conc_interface_MEA[t, x])
-                    == b.conc_interface_MEA[t, x]
-            )
+            return exp(b.log_conc_interface_MEA[t, x]) == b.conc_interface_MEA[t, x]
 
     blk.log_singular_CO2_CO2_ratio = Var(
         blk.flowsheet().time,
@@ -351,7 +346,7 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
             # Constraint written presently to lose meaning when dimensionless concentrations approach 1
             # If this form doesn't work, we can try one with division in it
             return exp(b.log_singular_CO2_CO2_ratio[t, x]) * (
-                    1 - b.conc_CO2_bulk[t, x]
+                1 - b.conc_CO2_bulk[t, x]
             ) == (1 - b.conc_CO2_equil_bulk[t, x])
 
     @blk.Constraint(
@@ -364,10 +359,10 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
             return Constraint.Skip
         else:
             return (
-                    b.log_enhancement_factor[t, x]
-                    == b.log_hatta_number[t, x]
-                    + b.log_conc_interface_MEA[t, x]
-                    + b.log_singular_CO2_CO2_ratio[t, x]
+                b.log_enhancement_factor[t, x]
+                == b.log_hatta_number[t, x]
+                + b.log_conc_interface_MEA[t, x]
+                + b.log_singular_CO2_CO2_ratio[t, x]
             )
             # return (b.enhancement_factor[t, x] * (
             #     1 - b.conc_CO2_bulk[t, x]
@@ -442,16 +437,17 @@ def make_enhancement_factor_model(blk, lunits, kinetics=None):
         blk.enhancement_factor_eqn1,
         blk.enhancement_factor_eqn2,
     ]
-    
+
     return enhancement_factor_vars, enhancement_factor_constraints
 
+
 def initialize_enhancement_factor_model(
-        blk,
-        state_args=None,
-        outlvl=idaeslog.NOTSET,
-        optarg=None,
-        solver=None,
-    ):
+    blk,
+    state_args=None,
+    outlvl=idaeslog.NOTSET,
+    optarg=None,
+    solver=None,
+):
     # Set up logger for initialization and solve
     init_log = idaeslog.getInitLogger(blk.name, outlvl, tag="unit")
     solve_log = idaeslog.getSolveLogger(blk.name, outlvl, tag="unit")
@@ -542,7 +538,6 @@ def initialize_enhancement_factor_model(
     #                 blk.conc_CO2_bulk[t, x], blk.log_conc_CO2_bulk_eqn[t, x]
     #             )
 
-
     #             if value(blk.conc_CO2_bulk[t, x]) < 1:
     #                 blk.conc_interface_MEA[t, x].value = 0.95
     #                 blk.log_conc_interface_MEA[t, x].value = log(0.95)
@@ -575,7 +570,7 @@ def initialize_enhancement_factor_model(
     #                     blk.conc_interface_MEA[t, x].value = Yminus**2
     #                 else:
     #                     raise AssertionError
-                    
+
     #                 blk.log_conc_interface_MEA[t, x].value = log(blk.conc_interface_MEA[t, x].value)
 
     #                 # Use new value for conc_interface_MEA to calculate enhancement factor
@@ -617,6 +612,5 @@ def initialize_enhancement_factor_model(
     #     with idaeslog.solver_log(solve_log, idaeslog.DEBUG) as slc:
     #         res = solver_obj.solve(tmp_blk, tee=slc.tee, symbolic_solver_labels=True)
     #     assert_optimal_termination(res)
-
 
     _restore_fixedness(flags)

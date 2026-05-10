@@ -22,6 +22,7 @@ streams and thus two inlet Ports (solid and liquid) and three outlet Ports (soli
 liquid with solids, separated liquids).
 
 """
+
 # Import Python libraries
 import logging
 from pandas import DataFrame
@@ -47,7 +48,6 @@ from idaes.models.unit_models.separator import (
 from idaes.core.initialization import BlockTriangularizationInitializer
 from idaes.core.util.config import is_physical_parameter_block
 from idaes.core.util.units_of_measurement import report_quantity
-
 
 __author__ = "Andrew Lee"
 

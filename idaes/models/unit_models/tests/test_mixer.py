@@ -15,6 +15,7 @@ Tests for ControlVolumeBlockData.
 
 Author: Andrew Lee
 """
+
 import pytest
 import pandas
 
@@ -91,12 +92,10 @@ from idaes.core.util.initialization import (
 )
 from idaes.core.util import DiagnosticsToolbox
 
-
 # TODO: Should have a test for this that does not require models_extra
 from idaes.models_extra.power_generation.properties.natural_gas_PR import get_prop
 import idaes.core.util.scaling as iscale
 from idaes.core.solvers import get_solver
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

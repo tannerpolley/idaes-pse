@@ -14,6 +14,7 @@
 Tests for Flash unit model.
 Author: Jaffer Ghouse
 """
+
 import pytest
 
 from pyomo.environ import (
@@ -49,7 +50,6 @@ from idaes.core.initialization import (
     InitializationStatus,
 )
 from idaes.core.util import DiagnosticsToolbox
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

@@ -15,6 +15,7 @@ Base class for custom scaling routines.
 
 Author: Andrew Lee
 """
+
 from copy import copy
 from enum import Enum
 

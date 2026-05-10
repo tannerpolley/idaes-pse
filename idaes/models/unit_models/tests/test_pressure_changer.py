@@ -15,6 +15,7 @@ Tests for Pressure Changer unit model.
 
 Author: Andrew Lee, Emmanuel Ogbe
 """
+
 import pytest
 
 from pyomo.environ import (
@@ -69,7 +70,6 @@ from idaes.core.initialization import (
     InitializationStatus,
 )
 from idaes.core.util import DiagnosticsToolbox
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

@@ -33,7 +33,6 @@ from idaes.models.properties.cubic_eos.cubic_prop_pack import (
 )
 from idaes.models.properties.modular_properties.eos.ceos import cubic_roots_available
 
-
 # Set module level pyest marker
 pytestmark = pytest.mark.cubic_root
 prop_available = cubic_roots_available()

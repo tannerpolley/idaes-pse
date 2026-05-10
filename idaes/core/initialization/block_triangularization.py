@@ -13,6 +13,7 @@
 """
 Initializer class for implementing Block Triangularization initialization
 """
+
 from pyomo.environ import SolverFactory
 from pyomo.common.config import Bool, ConfigDict, ConfigValue
 from pyomo.contrib.incidence_analysis import (

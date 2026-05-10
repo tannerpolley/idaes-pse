@@ -13,6 +13,7 @@
 """
 Author: Andrew Lee
 """
+
 import pytest
 from pyomo.environ import (
     check_optimal_termination,
@@ -51,7 +52,6 @@ import idaes.models.properties.modular_properties.pure.Perrys as Perrys
 import idaes.models.properties.modular_properties.pure.RPP4 as RPP4
 
 from idaes.models.properties.tests.test_harness import PropertyTestHarness
-
 
 # -----------------------------------------------------------------------------
 # Get default solver for testing

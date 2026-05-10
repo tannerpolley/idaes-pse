@@ -13,6 +13,7 @@
 """
 Generic IDAES 1D Heat Exchanger Model with overall area and heat transfer coefficient
 """
+
 # Import Pyomo libraries
 from pyomo.environ import (
     Block,
@@ -47,7 +48,6 @@ from idaes.core.util import scaling as iscale
 from idaes.core.solvers import get_solver
 from idaes.core.initialization import SingleControlVolumeUnitInitializer
 import idaes.logger as idaeslog
-
 
 __author__ = "Jaffer Ghouse, Andrew Lee"
 
