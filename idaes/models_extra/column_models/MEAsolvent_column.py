@@ -52,6 +52,7 @@ from idaes.core.util.exceptions import InitializationError
 import idaes.core.util.scaling as iscale
 from idaes.core.solvers.get_solver import get_solver
 import idaes.logger as idaeslog
+from idaes.models.properties.modular_properties.phase_equil.henry import HenryType
 
 from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order_explicit import (
     PseudoSecondOrderExplicit,
@@ -166,6 +167,20 @@ class MEAColumnData(PackedColumnData):
                     to_units=lunits("pressure"),
                 )
                 if j == "CO2":
+                    henry_config = lprops.params.get_component(j).config.henry_component["Liq"]
+                    if henry_config["type"] == HenryType.Kpx:
+                        # eNRTL reports Kpx (Pa per mole fraction), while
+                        # this enhancement-factor relation is written in Kpc.
+                        resistance = (
+                            blk.psi[t, x]
+                            * lprops.dens_mol_phase["Liq"]
+                            / lprops.henry["Liq", j]
+                        )
+                        return blk.pressure_equil[t, x, j] == (
+                            Pressure
+                            * blk.vapor_phase.properties[t, x].mole_frac_comp[j]
+                            + resistance * lprops.fug_phase_comp["Liq", j]
+                        ) / (1 + resistance)
                     return blk.pressure_equil[t, x, j] == (
                         (
                             blk.vapor_phase.properties[t, x].mole_frac_comp[j]
