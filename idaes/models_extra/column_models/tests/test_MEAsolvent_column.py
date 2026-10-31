@@ -32,6 +32,12 @@ import pyomo.common.unittest as unittest
 import idaes
 from idaes.core import FlowsheetBlock
 from idaes.models_extra.column_models.MEAsolvent_column import MEAColumn
+from idaes.models_extra.column_models.enhancement_factor_model_pseudo_second_order import (
+    PseudoSecondOrder,
+)
+from idaes.models_extra.column_models.enhancement_factor_model_third_order import (
+    ThirdOrder,
+)
 from idaes.models.properties.modular_properties.base.generic_property import (
     GenericParameterBlock,
 )
@@ -121,7 +127,7 @@ def _scale_mea_vapor_params(params, scaling_factor_flow_mol=3e-4):
 
 
 # -----------------------------------------------------------------------------
-def build_model():
+def build_model(**column_kwargs):
     m = ConcreteModel()
     m.fs = FlowsheetBlock(dynamic=False)
 
@@ -152,6 +158,7 @@ def build_model():
         finite_elements=x_nfe,
         vapor_phase={"property_package": m.fs.vapor_properties},
         liquid_phase={"property_package": m.fs.liquid_properties},
+        **column_kwargs,
     )
 
     # Fix column design variables
@@ -218,6 +225,19 @@ class Test_MEAColumn_Performance(PerformanceBaseClass, unittest.TestCase):
             res = solver.solve(model)
 
             assert_optimal_termination(res)
+
+
+@pytest.mark.skipif(solver is None, reason="Solver not available")
+@pytest.mark.component
+@pytest.mark.parametrize("enhancement_factor_model", [PseudoSecondOrder, ThirdOrder])
+def test_alternate_enhancement_factor_model(enhancement_factor_model):
+    m = build_model(enhancement_factor_model=enhancement_factor_model)
+    assert degrees_of_freedom(m) == 0
+    assert_units_consistent(m)
+    m.fs.unit.initialize(optarg={"bound_push": 1e-6, "max_iter": 400})
+    with idaes.temporary_config_ctx():
+        solver.options["bound_push"] = 1e-10
+        assert_optimal_termination(solver.solve(m))
 
 
 class TestAbsorber:

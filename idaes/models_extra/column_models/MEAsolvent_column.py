@@ -167,7 +167,9 @@ class MEAColumnData(PackedColumnData):
                     to_units=lunits("pressure"),
                 )
                 if j == "CO2":
-                    henry_config = lprops.params.get_component(j).config.henry_component["Liq"]
+                    henry_config = lprops.params.get_component(
+                        j
+                    ).config.henry_component["Liq"]
                     if henry_config["type"] == HenryType.Kpx:
                         # eNRTL reports Kpx (Pa per mole fraction), while
                         # this enhancement-factor relation is written in Kpc.
