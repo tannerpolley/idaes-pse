@@ -226,6 +226,7 @@ def make_enhancement_factor_model(blk, lunits, kinetics="Putta"):
                             "Liq", "CO2"
                         ]
                     )
+                    * lunits("density_mole")
                 )
                 / lunits("density_mole")
             ) == b.liquid_phase.properties[t, x].log_conc_mol_phase_comp_true[
